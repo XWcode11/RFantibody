@@ -12,8 +12,19 @@ RFantibody is a pipeline for the structure-based design of _de novo_ antibodies 
 The RFantibody pipeline is described in detail in [this preprint](https://www.biorxiv.org/content/10.1101/2024.03.14.585103v1)
 
 # Table of Contents
+- [RFantibody](#rfantibody)
+    - [Structure-Based _de novo_ Antibody Design](#structure-based-de-novo-antibody-design)
+- [Description](#description)
+- [Table of Contents](#table-of-contents)
 - [Requirements](#requirements)
+    - [Docker](#docker)
+    - [GPU Acceleration](#gpu-acceleration)
+- [Downloading Weights](#downloading-weights)
 - [Installation](#installation)
+  - [Building and Running the RFantibody Docker Container](#building-and-running-the-rfantibody-docker-container)
+    - [Build docker image](#build-docker-image)
+    - [Start the Docker image](#start-the-docker-image)
+  - [Setup the Python Environment](#setup-the-python-environment)
 - [Usage](#usage)
   - [HLT File Format](#hlt-file-format)
   - [Input Preparation](#input-preparation)
@@ -29,6 +40,7 @@ The RFantibody pipeline is described in detail in [this preprint](https://www.bi
   - [Choosing CDR Lengths](#choosing-cdr-lengths)
   - [Filtering Strategies](#filtering-strategies)
 - [Quiver Files](#quiver-files)
+  - [Reading and Writing Quiver Files](#reading-and-writing-quiver-files)
 - [Conclusion](#conclusion)
 
 
@@ -125,7 +137,7 @@ The antibody-finetuned version of RFdiffusion in RFantibody requires an HLT-rema
 ```
 # From inside of the rfantibody container
 
-poetry run python /home/scripts/util/chothia_to_HLT.py -inpdb mychothia.pdb -outpdb myHLT.pdb
+poetry run python /home/scripts/util/chothia2HLT.py  mychothia.pdb -outpdb myHLT.pdb
 ```
 
 This script expects a Chothia annotated .pdb file. A great source for these files is [SabDab](https://opig.stats.ox.ac.uk/webapps/sabdab-sabpred/sabdab), which provides Chothia annotated structures of all antibodies and nanobodies in the PDB and is updated every few months.
@@ -142,7 +154,7 @@ The first step in RFantibody is to generate antibody-target docks using an antib
 ```
 # From inside of the rfantibody container
 
-poetry run python  /home/src/rfantibody/scripts/rfdiffusion_inference.py \
+poetry run python  /home/src/rfantibody/rfdiffusion/rfdiffusion_inference.py \
     --config-name antibody \
     antibody.target_pdb=/home/scripts/examples/example_inputs/rsv_site3.pdb \
     antibody.framework_pdb=/home/scripts/examples/example_inputs/hu-4D5-8_Fv.pdb \
