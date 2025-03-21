@@ -8,3 +8,7 @@ cached_schedules
 example_outputs
 include/USalign
 weights
+output_data/*
+input_data/*
+outputs/*
+check.point
