@@ -14,7 +14,8 @@ packages = [
 ]
 
 [[tool.poetry.source]]
-name = "pypi"
+name = "tsinghua"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 priority = "primary"
 
 [[tool.poetry.source]]
