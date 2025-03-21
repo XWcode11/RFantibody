@@ -96,7 +96,7 @@ docker build -t rfantibody .
 ### Start the Docker image
 Run the following command to start the docker container based on the image you just built:
 ```
-docker run --name rfantibody --gpus all -v .:/home --memory 10g -it rfantibody
+docker run --name rfantibody_xw --gpus all -v .:/home --memory 20g -it rfantibody:xw
 ```
 This will put you into the RFantibody container at the /home directory which mirrors the directory that you ran the last command from.
 
@@ -137,7 +137,7 @@ The antibody-finetuned version of RFdiffusion in RFantibody requires an HLT-rema
 ```
 # From inside of the rfantibody container
 
-poetry run python /home/scripts/util/chothia2HLT.py  mychothia.pdb -outpdb myHLT.pdb
+poetry run python /home/scripts/util/chothia2HLT.py  mychothia.pdb -outpdb myHLT.pdb, see --help
 ```
 
 This script expects a Chothia annotated .pdb file. A great source for these files is [SabDab](https://opig.stats.ox.ac.uk/webapps/sabdab-sabpred/sabdab), which provides Chothia annotated structures of all antibodies and nanobodies in the PDB and is updated every few months.
