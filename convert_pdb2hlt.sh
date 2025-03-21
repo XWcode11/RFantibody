@@ -8,9 +8,11 @@ name=$(basename "$original_pdb")
 name="${name%.*}"
 
 # set the path and name of the hlt pdb
-hlt_pdb="${original_dir}/${name}_hlt.pdb"
+hlt_dir="${original_dir}/hlt"
+mkdir -p "$hlt_dir"
+hlt_pdb="${hlt_dir}/${name}.pdb"
 
 # convert pdb to hlt pdb
-python /home/scripts/util/chothia2HLT.py "$original_pdb" --heavy H --light L --target A --output "$hlt_pdb"
+poetry run python /home/scripts/util/chothia2HLT.py "$original_pdb" --heavy H --light L --target A --output "$hlt_pdb"
 
-echo "Converting finished: $hlt_pdb"
+echo "Converting finished: $hlt_pdb !"
