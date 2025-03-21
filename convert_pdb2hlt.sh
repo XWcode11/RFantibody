@@ -8,8 +8,9 @@ name=$(basename "$original_pdb")
 name="${name%.*}"
 
 # set the path and name of the hlt pdb
-hlt_dir="${original_dir}/hlt"
+hlt_dir="${original_dir}/HLT"
 mkdir -p "$hlt_dir"
+
 hlt_pdb="${hlt_dir}/${name}.pdb"
 
 # convert pdb to hlt pdb
