@@ -33,37 +33,46 @@ class SampleFeatures():
         """
 
         # First do some sanity checks
-
         if loop_string == '':
             raise Exception('Received empty loop string. Skipping example')
 
         desloops = [l.upper() for l in loop_string.split(',')]
+        print(f"Designed loops: {desloops}")
 
         fixed_res = {}
 
         nchains = self.pose.chain.size
+        print(f"Number of chains: {nchains}")
         
         if nchains <= 1:
             raise Exception('Too few chains detected. Skipping')
-
+        
         # Now, we will make a fixed res dictionary for each chain that indicates which residues in each
         # chain should NOT be designed by ProteinMPNN
 
         # Determine the length of the H chain
         lenH = np.where(self.pose.chain == 'H')[0].size
         lenL = np.where(self.pose.chain == 'L')[0].size
+        print(f"Length of H chain: {lenH}, Length of L chain: {lenL}")
 
         # Now we will parse the H chain loops (if any)
         loopH = []
         for loop in desloops:
             if 'H' in loop:
-                loopH += self.pose.cdr_dict[loop]
+                # cdr_dict contains 0-based indices, convert to 1-based
+                loopH += [res + 1 for res in self.pose.cdr_dict[loop]]
+                print(f"\nProcessing {loop}:")
+                print(f"Converted to 1-based: {[res + 1 for res in self.pose.cdr_dict[loop]]}")
 
         # Then we will parse the L chain loops (if any)
         loopL = []
         for loop in desloops:
             if 'L' in loop:
-                loopL += self.pose.cdr_dict[loop]
+                # cdr_dict contains 0-based indices, convert to 1-based
+                loopL += [res + 1 for res in self.pose.cdr_dict[loop]]
+                print(f"\nProcessing {loop}:")
+                print(f"Converted to 1-based: {[res + 1 for res in self.pose.cdr_dict[loop]]}")
+
 
         # We must now invert these "designable" residue lists into "fixed" residue lists
         idxH = list(range(1, lenH + 1))
@@ -85,21 +94,17 @@ class SampleFeatures():
 
         if 'T' in self.pose.chain:
             lenT = np.where(self.pose.chain == 'T')[0].size
-
             idxT = list(range(1, lenT + 1))
-
             fixed_res['T'] = idxT
 
         # Final assignment
         self.fixed_res = fixed_res
         self.chains = np.unique(self.pose.chain).tolist()
-            
-    
+        
     def thread_mpnn_seq(self, binder_seq: str) -> None:
         '''
         Thread the binder sequence onto the pose being designed
         '''
-
         for resi, mut_to in enumerate(binder_seq):
             name3 = aa_1_3[mut_to]
 
