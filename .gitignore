@@ -12,3 +12,4 @@ output_data/*
 input_data/*
 outputs/*
 check.point
+samples/*
