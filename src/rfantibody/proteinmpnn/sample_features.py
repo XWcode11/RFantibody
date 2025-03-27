@@ -37,7 +37,7 @@ class SampleFeatures():
             raise Exception('Received empty loop string. Skipping example')
 
         desloops = [l.upper() for l in loop_string.split(',')]
-        print(f"Designed loops: {desloops}")
+        print(f"\n Designed loops: {desloops}")
 
         fixed_res = {}
 
@@ -59,19 +59,17 @@ class SampleFeatures():
         loopH = []
         for loop in desloops:
             if 'H' in loop:
-                # cdr_dict contains 0-based indices, convert to 1-based
-                loopH += [res + 1 for res in self.pose.cdr_dict[loop]]
-                print(f"\nProcessing {loop}:")
-                print(f"Converted to 1-based: {[res + 1 for res in self.pose.cdr_dict[loop]]}")
+                loopH += self.pose.cdr_dict[loop]
+                print(f"\n {loop}:{self.pose.cdr_dict[loop]}")
+               
 
         # Then we will parse the L chain loops (if any)
         loopL = []
         for loop in desloops:
             if 'L' in loop:
-                # cdr_dict contains 0-based indices, convert to 1-based
-                loopL += [res + 1 for res in self.pose.cdr_dict[loop]]
-                print(f"\nProcessing {loop}:")
-                print(f"Converted to 1-based: {[res + 1 for res in self.pose.cdr_dict[loop]]}")
+                loopL += self.pose.cdr_dict[loop]
+                print(f"\n {loop}:{self.pose.cdr_dict[loop]}")
+
 
 
         # We must now invert these "designable" residue lists into "fixed" residue lists
@@ -79,7 +77,7 @@ class SampleFeatures():
         for res in loopH:
             idxH.remove(res)
 
-        print(f'loopH: {loopH}')
+        print(f'\n loopH: {loopH}')
         print(f'loopL: {loopL}')
 
         idxL = list(range(lenH + 1, lenH + lenL + 1))
