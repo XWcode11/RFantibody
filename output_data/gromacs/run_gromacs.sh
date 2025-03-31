@@ -1,17 +1,30 @@
-#!/bin/bash
-
-# 脚本名称: run_gromacs_fep.sh
-# 目的: 使用 GROMACS 和 FEP 方法计算抗原-抗体结合能
-
-# 设置工作目录和文件路径
+# ========== 设置工作目录和文件路径 ==========
 WORK_DIR="/mnt/data1/xiongw/Projects/active/RFantibody/output_data/gromacs"
 INPUT_PDB="/mnt/data1/xiongw/Projects/active/RFantibody/output_data/rf2/hPDL1_N_hlt-1C2_Chothia_hlt-20250327-1/hPDL1_N_hlt-1C2_Chothia_hlt-20250327-1_0_dldesign_0_best.pdb"
 BASE_NAME="hPDL1_N_hlt-1C2_Chothia_hlt-20250327-1_0_dldesign_0_best"
 MDP_DIR="/mnt/data1/xiongw/Projects/active/RFantibody/output_data/gromacs/MDP_DIR"
 
-# 创建工作目录（如果不存在）
-# mkdir -p "$WORK_DIR"
-cd "$WORK_DIR" || exit
+# ========== 控制每个步骤是否执行的开关 ==========
+DO_PDB2GMX=false      # 生成拓扑文件
+DO_MAKE_NDX=false     # 创建索引文件
+DO_EDITCONF=false     # 定义模拟盒子
+DO_SOLVATE=false      # 添加溶剂
+DO_IONS=false         # 添加离子
+DO_EM=false           # 能量最小化
+DO_NVT=true          # NVT平衡
+DO_NPT=true          # NPT平衡
+DO_MD=false           # 生产性MD模拟
+DO_FEP_PREP=false     # 准备FEP拓扑
+DO_FEP_WINDOWS=false  # 创建FEP窗口
+DO_FEP_ANALYSIS=false # 分析FEP结果
+
+# ========== 日志设置 ==========
+LOG_FILE="${WORK_DIR}/gromacs_fep_$(date +%Y%m%d_%H%M%S).log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+echo "开始运行时间: $(date)"
+
+# ========== 基础准备 ==========
+cd "$WORK_DIR" || { echo "错误: 无法进入工作目录"; exit 1; }
 
 # 检查 GROMACS 是否可用
 if ! command -v gmx &> /dev/null; then
@@ -19,132 +32,294 @@ if ! command -v gmx &> /dev/null; then
     exit 1
 fi
 
-# 1. 生成拓扑文件和初始结构
-echo "步骤 1: 生成拓扑文件和初始结构..."
-gmx pdb2gmx -f "$INPUT_PDB" \
-    -o "${BASE_NAME}.gro" \
-    -water spce \
-    -ff amber99sb \
-    -ignh || { echo "pdb2gmx 失败"; exit 1; }
-[ -f "topol.top" ] || { echo "topol.top 未生成"; exit 1; }
+# ========== 步骤1: 生成拓扑文件和初始结构 ==========
+if $DO_PDB2GMX; then
+    echo "步骤 1: 生成拓扑文件和初始结构..."
+    gmx pdb2gmx -f "$INPUT_PDB" \
+        -o "${BASE_NAME}.gro" \
+        -water spce \
+        -ff amber99sb \
+        -ignh || { echo "pdb2gmx 失败"; exit 1; }
+    [ -f "topol.top" ] || { echo "topol.top 未生成"; exit 1; }
+    echo "✓ 步骤1已完成"
+else
+    echo "步骤 1: 跳过拓扑文件生成"
+fi
 
-# 创建索引文件，定义抗原和抗体组（H 和 L 为抗体，T 为抗原）
-echo "生成索引文件..."
-echo -e "chain H L\nchain T\nq" | gmx make_ndx -f "${BASE_NAME}.gro" -o index.ndx || { echo "make_ndx 失败"; exit 1; }
+# ========== 步骤2: 创建索引文件 ==========
+if $DO_MAKE_NDX; then
+    echo "步骤 2: 生成索引文件..."
+    echo -e "chain H L\nchain T\nq" | gmx make_ndx -f "${BASE_NAME}.gro" -o index.ndx || { echo "make_ndx 失败"; exit 1; }
+    echo "✓ 步骤2已完成"
+else
+    echo "步骤 2: 跳过索引文件生成"
+fi
 
-# 2. 定义模拟盒子
-echo "步骤 2: 定义模拟盒子..."
-gmx editconf -f "${BASE_NAME}.gro" \
-    -o "${BASE_NAME}-box.gro" \
-    -d 1.2 \
-    -bt cubic || { echo "editconf 失败"; exit 1; }
+# ========== 步骤3: 定义模拟盒子 ==========
+if $DO_EDITCONF; then
+    echo "步骤 3: 定义模拟盒子..."
+    gmx editconf -f "${BASE_NAME}.gro" \
+        -o "${BASE_NAME}-box.gro" \
+        -d 1.2 \
+        -bt cubic || { echo "editconf 失败"; exit 1; }
+    echo "✓ 步骤3已完成"
+else
+    echo "步骤 3: 跳过模拟盒子定义"
+fi
 
-
-# 3. 添加溶剂（水分子）
-echo "步骤 3: 添加溶剂..."
-gmx solvate -cp "${BASE_NAME}-box.gro" \
-    -cs spc216.gro \
-    -o "${BASE_NAME}_solv.gro" \
-    -p topol.top || { echo "solvate 失败"; exit 1; }
-
-# 4. 添加离子以中和电荷
-echo "步骤 4: 添加离子..."
-gmx grompp -f "${MDP_DIR}/ions.mdp" \
-    -c "${BASE_NAME}_solv.gro" \
-    -p topol.top \
-    -maxwarn 1 \
-    -o "${BASE_NAME}-ions.tpr" || { echo "grompp for ions 失败"; exit 1; }
-gmx genion -s "${BASE_NAME}-ions.tpr" \
-    -o "${BASE_NAME}_ions.gro" \
-    -p topol.top \
-    -pname NA \
-    -nname CL \
-    -neutral << EOF
-SOL
-EOF
-[ $? -eq 0 ] || { echo "genion 失败"; exit 1; }
-
-# 5. 能量最小化
-echo "步骤 5: 能量最小化..."
-gmx grompp -f "${MDP_DIR}/minim.mdp" \
-    -c "${BASE_NAME}_ions.gro" \
-    -p topol.top \
-    -o em.tpr || { echo "grompp for minimization 失败"; exit 1; }
-gmx mdrun -v -deffnm em || { echo "mdrun for minimization 失败"; exit 1; }
-
-# 6. NVT 平衡
-echo "步骤 6: NVT 平衡..."
-gmx grompp -f "${MDP_DIR}/nvt.mdp" \
-    -c em.gro \
-    -p topol.top \
-    -n index.ndx \
-    -o nvt.tpr || { echo "grompp for NVT 失败"; exit 1; }
-gmx mdrun -v -deffnm nvt || { echo "mdrun for NVT 失败"; exit 1; }
-
-# 7. NPT 平衡
-echo "步骤 7: NPT 平衡..."
-gmx grompp -f "${MDP_DIR}/npt.mdp" \
-    -c nvt.gro \
-    -p topol.top \
-    -n index.ndx \
-    -o npt.tpr || { echo "grompp for NPT 失败"; exit 1; }
-gmx mdrun -v -deffnm npt || { echo "mdrun for NPT 失败"; exit 1; }
-
-# 8. 生产性 MD 模拟
-echo "步骤 8: 生产性 MD 模拟..."
-gmx grompp -f "${MDP_DIR}/md.mdp" \
-    -c npt.gro \
-    -p topol.top \
-    -n index.ndx \
-    -o md.tpr || { echo "grompp for MD 失败"; exit 1; }
-gmx mdrun -v -deffnm md || { echo "mdrun for MD 失败"; exit 1; }
-
-# 生成 FEP 拓扑文件
-echo "生成 FEP 拓扑文件..."
-cp topol_Protein_chain_T.itp topol_Protein_chain_T_fep.itp
-sed -i '/\[ atoms \]/,/^\s*$/ s/\(\s*[0-9]\+\s\+[A-Za-z0-9]\+\s\+[0-9]\+\s\+[A-Za-z]\+\s\+[A-Za-z0-9]\+\s\+[0-9]\+\s\+[-0-9.]\+\s\+[0-9.]\+\)/\1 \2 0.0 \3/' topol_Protein_chain_T_fep.itp
-sed -i '/#include "topol_Protein_chain_T.itp"/a #include "topol_Protein_chain_T_fep.itp"' topol.top
-
-# 9. FEP 准备：创建多个 λ 窗口的目录和拓扑
-echo "步骤 9: 准备 FEP 模拟..."
-mkdir -p fep_windows
-cd fep_windows || exit
-
-# 定义 λ 值（21 个窗口）
-LAMBDA_VALUES=(0.00 0.05 0.10 0.15 0.20 0.25 0.30 0.35 0.40 0.45 0.50 0.55 0.60 0.65 0.70 0.75 0.80 0.85 0.90 0.95 1.00)
-for i in "${!LAMBDA_VALUES[@]}"; do
-    L_DIR="lambda_${LAMBDA_VALUES[$i]}"
-    mkdir -p "$L_DIR"
-    cd "$L_DIR" || exit
+# ========== 步骤4: 添加溶剂 ==========
+if $DO_SOLVATE; then
+    echo "步骤 4: 添加溶剂..."
+    # 备份原始拓扑文件以确保正确恢复
+    cp topol.top topol.top.bak
     
-    # 复制初始结构和拓扑
-    cp "../../md.gro" "./${BASE_NAME}_start.gro"
-    cp "../../topol.top" "./topol.top"
-    cp "../../topol_Protein_chain_H.itp" "./"
-    cp "../../topol_Protein_chain_L.itp" "./"
-    cp "../../topol_Protein_chain_T.itp" "./"
-    cp "../../topol_Protein_chain_T_fep.itp" "./"
-    cp "../../index.ndx" "./index.ndx"
-    cp "../../${MDP_DIR}/fep.mdp" "./fep.mdp"
+    gmx solvate -cp "${BASE_NAME}-box.gro" \
+        -cs spc216.gro \
+        -o "${BASE_NAME}_solv.gro" \
+        -p topol.top || { echo "solvate 失败"; exit 1; }
     
-    # 生成 .tpr 文件，指定当前 λ 状态
-    gmx grompp -f fep.mdp \
-        -c "${BASE_NAME}_start.gro" \
+    # 验证溶剂化后的拓扑与结构匹配
+    SOLV_ATOMS=$(grep -c "ATOM" "${BASE_NAME}_solv.gro")
+    echo "溶剂化后结构中的原子数: $SOLV_ATOMS"
+    
+    echo "✓ 步骤4已完成"
+else
+    echo "步骤 4: 跳过溶剂添加"
+fi
+
+# ========== 步骤5: 添加离子 ==========
+if $DO_IONS; then
+    echo "步骤 5: 添加离子..."
+    
+    # 先检查结构文件和拓扑文件是否匹配
+    if [ -f "${BASE_NAME}_solv.gro" ] && [ -f "topol.top" ]; then
+        # 获取拓扑文件中的原子数（估计值）
+        TOP_ATOMS=$(grep -A 1000 "\[ molecules \]" topol.top | grep -v "\[" | awk '{sum+=$2} END {print sum}')
+        
+        # 获取结构文件中的原子数
+        GRO_ATOMS=$(grep -c "ATOM" "${BASE_NAME}_solv.gro" || wc -l < "${BASE_NAME}_solv.gro")
+        
+        echo "拓扑文件中的预估原子数: $TOP_ATOMS"
+        echo "结构文件中的原子数: $GRO_ATOMS"
+        
+        # 如果不匹配，尝试修复
+        if [ "$TOP_ATOMS" != "$GRO_ATOMS" ]; then
+            echo "警告: 拓扑文件与结构文件不匹配，尝试修复..."
+            
+            # 恢复备份的拓扑文件
+            if [ -f "topol.top.bak" ]; then
+                cp topol.top.bak topol.top
+                echo "已恢复原始拓扑文件"
+            fi
+            
+            # 重新生成溶剂化系统
+            echo "重新进行溶剂化..."
+            gmx solvate -cp "${BASE_NAME}-box.gro" \
+                -cs spc216.gro \
+                -o "${BASE_NAME}_solv.gro" \
+                -p topol.top || { echo "溶剂化失败"; exit 1; }
+        fi
+    else
+        echo "错误: 缺少溶剂化结构文件或拓扑文件"
+        exit 1
+    fi
+    
+    # 使用改进的离子添加步骤，增加maxwarn
+    gmx grompp -f "${MDP_DIR}/ions.mdp" \
+        -c "${BASE_NAME}_solv.gro" \
+        -p topol.top \
+        -o "${BASE_NAME}-ions.tpr" \
+        -maxwarn 2 || { echo "grompp for ions 失败"; exit 1; }
+    
+    echo -e "SOL" | gmx genion -s "${BASE_NAME}-ions.tpr" \
+        -o "${BASE_NAME}_ions.gro" \
+        -p topol.top \
+        -pname NA \
+        -nname CL \
+        -neutral || { echo "genion 失败"; exit 1; }
+    
+    echo "✓ 步骤5已完成"
+else
+    echo "步骤 5: 跳过离子添加"
+fi
+
+# ========== 步骤6: 能量最小化 ==========
+if $DO_EM; then
+    echo "步骤 6: 能量最小化..."
+    # 检查文件是否存在
+    if [ ! -f "${BASE_NAME}_ions.gro" ]; then
+        echo "错误: 离子化结构文件不存在"
+        exit 1
+    fi
+    
+    gmx grompp -f "${MDP_DIR}/minim.mdp" \
+        -c "${BASE_NAME}_ions.gro" \
+        -p topol.top \
+        -o em.tpr \
+        -maxwarn 1 || { echo "grompp for minimization 失败"; exit 1; }
+    
+    gmx mdrun -v -deffnm em || { echo "mdrun for minimization 失败"; exit 1; }
+    
+    # 验证能量最小化结果
+    if [ -f "em.gro" ] && [ -f "em.edr" ]; then
+        echo "能量最小化完成，生成了em.gro和em.edr文件"
+    else
+        echo "警告: 能量最小化可能未正确完成"
+    fi
+    
+    echo "✓ 步骤6已完成"
+else
+    echo "步骤 6: 跳过能量最小化"
+fi
+
+# ========== 步骤7: NVT平衡 ==========
+if $DO_NVT; then
+    echo "步骤 7: NVT平衡..."
+    if [ ! -f "em.gro" ]; then
+        echo "错误: 能量最小化结构文件不存在"
+        exit 1
+    fi
+    
+    # 确保索引文件包含SOL组
+    if [ ! -f "index.ndx" ]; then
+        echo "生成索引文件..."
+        echo -e "chain H L\nchain T\nr SOL\nq" | gmx make_ndx -f "em.gro" -o index.ndx || { echo "make_ndx 失败"; exit 1; }
+    fi
+    
+    gmx grompp -f "${MDP_DIR}/nvt.mdp" \
+        -c em.gro \
         -p topol.top \
         -n index.ndx \
-        -o fep.tpr \
-        -maxwarn 1 \
-        -l "$i" || { echo "grompp for λ=${LAMBDA_VALUES[$i]} 失败"; exit 1; }
+        -o nvt.tpr \
+        -maxwarn 1 || { echo "grompp for NVT 失败"; exit 1; }
     
-    # 运行 FEP 模拟（后台运行）
-    gmx mdrun -v -deffnm fep &
-    cd .. || exit
-done
-wait  # 等待所有后台任务完成
+    # 使用更稳定的CPU模式
+    gmx mdrun -v -deffnm nvt -nb cpu -ntmpi 1 -ntomp 4 || { echo "mdrun for NVT 失败"; exit 1; }
+    echo "✓ 步骤7已完成"
+else
+    echo "步骤 7: 跳过NVT平衡"
+fi
 
-# 10. 分析 FEP 结果
-echo "步骤 10: 分析 FEP 结果..."
-cd "$WORK_DIR" || exit
-gmx bar -f fep_windows/lambda_*/fep.xvg -o bar.xvg -b 1000 || { echo "gmx bar 失败"; exit 1; }
+# ========== 步骤8: NPT平衡 ==========
+if $DO_NPT; then
+    echo "步骤 8: NPT平衡..."
+    gmx grompp -f "${MDP_DIR}/npt.mdp" \
+        -c nvt.gro \
+        -p topol.top \
+        -n index.ndx \
+        -o npt.tpr || { echo "grompp for NPT 失败"; exit 1; }
+    gmx mdrun -v -deffnm npt || { echo "mdrun for NPT 失败"; exit 1; }
+    echo "✓ 步骤8已完成"
+else
+    echo "步骤 8: 跳过NPT平衡"
+fi
 
-echo "完成！请查看 bar.xvg 文件以获取结合自由能结果。"
+# ========== 步骤9: 生产性MD模拟 ==========
+if $DO_MD; then
+    echo "步骤 9: 生产性MD模拟..."
+    gmx grompp -f "${MDP_DIR}/md.mdp" \
+        -c npt.gro \
+        -p topol.top \
+        -n index.ndx \
+        -o md.tpr || { echo "grompp for MD 失败"; exit 1; }
+    gmx mdrun -v -deffnm md || { echo "mdrun for MD 失败"; exit 1; }
+    echo "✓ 步骤9已完成"
+else
+    echo "步骤 9: 跳过生产性MD模拟"
+fi
+
+# ========== 步骤10: 准备FEP拓扑 ==========
+if $DO_FEP_PREP; then
+    echo "步骤 10: 准备FEP拓扑..."
+    # 1. 复制原始抗原拓扑文件
+    cp topol_Protein_chain_T.itp topol_Protein_chain_T_fep.itp
+
+    # 2. 在原子部分添加B状态参数（电荷为0）
+    awk '
+        /\[ atoms \]/ {print; getline; print; in_atoms=1; next}
+        in_atoms && NF>=8 {print $0" "$1" 0.0 "$8; next}  
+        in_atoms && NF==0 {in_atoms=0; print; next}
+        {print}
+    ' topol_Protein_chain_T.itp > topol_Protein_chain_T_fep.itp
+
+    # 3. 将新拓扑文件添加到主拓扑文件中
+    if ! grep -q "topol_Protein_chain_T_fep.itp" topol.top; then
+        sed -i '/#include "topol_Protein_chain_T.itp"/a #include "topol_Protein_chain_T_fep.itp"' topol.top
+    fi
+
+    # 4. 添加耦合参数到拓扑文件
+    echo -e "\n[ moleculetype ]\n; Name         nrexcl\nProtein_chain_T_fep     3\n" >> topol.top
+    echo -e "[ intermolecular_interactions ]\n[ energygrps_table ]\nProtein_chain_H Protein_chain_L Protein_chain_T_fep\n" >> topol.top
+    echo "✓ 步骤10已完成"
+else
+    echo "步骤 10: 跳过FEP拓扑准备"
+fi
+
+# ========== 步骤11: 创建FEP窗口 ==========
+if $DO_FEP_WINDOWS; then
+    echo "步骤 11: 创建FEP窗口..."
+    mkdir -p fep_windows
+    cd fep_windows || exit
+
+    # 定义 λ 值（21 个窗口）
+    LAMBDA_VALUES=(0.00 0.05 0.10 0.15 0.20 0.25 0.30 0.35 0.40 0.45 0.50 0.55 0.60 0.65 0.70 0.75 0.80 0.85 0.90 0.95 1.00)
+    
+    # 设置最大并行任务数
+    MAX_JOBS=4  # 根据系统资源调整
+    RUNNING=0
+    
+    for i in "${!LAMBDA_VALUES[@]}"; do
+        L_DIR="lambda_${LAMBDA_VALUES[$i]}"
+        mkdir -p "$L_DIR"
+        cd "$L_DIR" || exit
+        
+        # 复制初始结构和拓扑
+        cp "../../md.gro" "./${BASE_NAME}_start.gro"
+        cp "../../topol.top" "./topol.top"
+        cp "../../topol_Protein_chain_H.itp" "./"
+        cp "../../topol_Protein_chain_L.itp" "./"
+        cp "../../topol_Protein_chain_T.itp" "./"
+        cp "../../topol_Protein_chain_T_fep.itp" "./"
+        cp "../../index.ndx" "./index.ndx"
+        cp "../../${MDP_DIR}/fep.mdp" "./fep.mdp"
+        
+        # 生成 .tpr 文件，指定当前 λ 状态
+        # 注意：在实际使用时，应在fep.mdp中设置init-lambda-state参数
+        gmx grompp -f fep.mdp \
+            -c "${BASE_NAME}_start.gro" \
+            -p topol.top \
+            -n index.ndx \
+            -o fep.tpr \
+            -maxwarn 1 || { echo "grompp for λ=${LAMBDA_VALUES[$i]} 失败"; exit 1; }
+        
+        # 运行 FEP 模拟（后台并控制并行数）
+        gmx mdrun -v -deffnm fep &
+        RUNNING=$((RUNNING+1))
+        
+        # 当达到最大并发数时等待任务完成
+        if [ $RUNNING -ge $MAX_JOBS ]; then
+            wait -n
+            RUNNING=$((RUNNING-1))
+        fi
+        
+        cd .. || exit
+    done
+    wait  # 等待所有剩余任务完成
+    cd "$WORK_DIR" || exit
+    echo "✓ 步骤11已完成"
+else
+    echo "步骤 11: 跳过FEP窗口创建"
+fi
+
+# ========== 步骤12: 分析FEP结果 ==========
+if $DO_FEP_ANALYSIS; then
+    echo "步骤 12: 分析FEP结果..."
+    gmx bar -f fep_windows/lambda_*/fep.xvg -o bar.xvg -b 1000 || { echo "gmx bar 失败"; exit 1; }
+    echo "✓ 步骤12已完成"
+else
+    echo "步骤 12: 跳过FEP结果分析"
+fi
+
+echo "完成时间: $(date)"
+echo "日志已保存到: $LOG_FILE"
+echo "如需查看结合自由能结果，请检查 bar.xvg 文件"
