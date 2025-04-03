@@ -14,13 +14,14 @@ TAG=$3
 
 # 如果没有提供TAG，使用当前日期
 if [ -z "$TAG" ]; then
-    TAG=$(date +%Y%m%d-%H%M)
+    TAG=$(date +%Y%m%d%H%M)
 fi
 
 # 获取文件名（不带路径和扩展名）
 ANTIGEN_NAME=$(basename "$ANTIGEN_PDB" .pdb)
 ANTIBODY_NAME=$(basename "$ANTIBODY_PDB" .pdb)
 OUTPUT_NAME="${ANTIGEN_NAME}-${ANTIBODY_NAME}-${TAG}"
+
 
 echo "========================================================"
 echo "开始抗体设计流程"
@@ -36,7 +37,8 @@ docker start rfantibody_xw
 
 # 2. 在容器内运行pipeline脚本
 echo "步骤2: 运行抗体设计pipeline..."
-docker exec rfantibody_xw bash -c "cd /home && ./run_pipeline.sh $ANTIGEN_PDB $ANTIBODY_PDB $TAG"
+docker exec rfantibody_xw bash -c "chmod +x /home/run_rfantibody.sh 2>/dev/null || echo '无法设置容器内脚本权限，可能需要手动设置'"
+docker exec rfantibody_xw bash -c "cd /home && ./run_rfantibody.sh $ANTIGEN_PDB $ANTIBODY_PDB $TAG"
 
 # 3. 准备Rosetta输入
 echo "步骤3: 准备Rosetta结构优化..."
