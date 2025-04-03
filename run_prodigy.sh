@@ -8,3 +8,6 @@ for pdb_file in output_data/rf2/hPDL1_N_hlt-1C2_Chothia_hlt-20250327-1/*.pdb; do
     prodigy "$pdb_file" --selection H,L T > output_data/prodigy/${prefix}.txt
 done
 
+
+
+
