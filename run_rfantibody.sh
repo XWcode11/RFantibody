@@ -4,14 +4,12 @@ antibody_hlt_pdb=$2
 tag=$3
 # If tag is not provided, use today's date as the tag
 if [ -z "$tag" ]; then
-    tag=$(date +%Y%m%d)
+    tag=$(date +%Y%m%d%H%M)
 fi
 # get filenames and remove the extension
-antigen_filename=$(basename "$antigen_hlt_pdb")
-antigen_filename="${antigen_filename%.*}"
+antigen_filename=$(basename "$antigen_hlt_pdb" .pdb)
 
-antibody_filename=$(basename "$antibody_hlt_pdb")
-antibody_filename="${antibody_filename%.*}"
+antibody_filename=$(basename "$antibody_hlt_pdb" .pdb)
 
 output_name=${antigen_filename}-${antibody_filename}
 
