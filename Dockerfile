@@ -20,4 +20,7 @@ RUN pip install poetry -i https://pypi.tuna.tsinghua.edu.cn/simple/
 # Set the working directory to the user's home directory
 WORKDIR /home
 
+ENV http_proxy=http://127.0.0.1:7897
+ENV https_proxy=http://127.0.0.1:7897
+
 ENTRYPOINT ["/bin/bash"]
