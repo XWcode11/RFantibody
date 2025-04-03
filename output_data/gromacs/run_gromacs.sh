@@ -9,19 +9,19 @@ MDP_DIR="/mnt/data1/xiongw/Projects/active/RFantibody/output_data/gromacs/MDP_DI
 
 
 # ========== 清理中间文件 (新增) ==========
-# rm -f *.gro *.tpr *.top *.edr *.log *.cpt index.ndx *.xvg
+# rm -f *.gro *.tpr *.top *.edr *.log *.cpt index.ndx *.xvg 
 
 # ========== 控制每个步骤是否执行的开关 ==========
-DO_PDB2GMX=false       # 生成拓扑文件 (强制重新生成)
-DO_MAKE_NDX=false      # 创建索引文件 (强制重新生成)
-DO_EDITCONF=false      # 定义模拟盒子 (强制重新生成)
-DO_SOLVATE=false       # 添加溶剂 (强制重新生成)
-DO_IONS=false          # 添加离子 (强制重新生成)
-DO_EM=false            # 能量最小化 (强制重新运行)
-DO_NVT=false           # NVT平衡 (强制重新运行)
-DO_NPT=false          # NPT平衡 (强制重新运行)
-DO_MD=false           # 生产性MD模拟
-DO_FEP_PREP=false     # 准备FEP拓扑
+DO_PDB2GMX=true       # 生成拓扑文件
+DO_MAKE_NDX=true      # 创建索引文件
+DO_EDITCONF=true      # 定义模拟盒子
+DO_SOLVATE=true       # 添加溶剂
+DO_IONS=true          # 添加离子
+DO_EM=true            # 能量最小化
+DO_NVT=true           # NVT平衡
+DO_NPT=true          # NPT平衡
+DO_MD=true           # 生产性MD模拟
+DO_FEP_PREP=true     # 准备FEP拓扑
 DO_FEP_WINDOWS=true  # 创建FEP窗口
 DO_FEP_ANALYSIS=false # 分析FEP结果
 
@@ -318,99 +318,4 @@ if $DO_MD; then
 else
     echo "步骤 9: 跳过生产性MD模拟"
 fi
-
-# ========== 步骤10: 准备FEP拓扑 ==========
-if $DO_FEP_PREP; then
-    echo "步骤 10: 准备FEP拓扑..."
-    # 1. 复制原始抗原拓扑文件
-    cp topol_Protein_chain_T.itp topol_Protein_chain_T_fep.itp
-
-    # 2. 在原子部分添加B状态参数（电荷为0）
-    awk '
-        /\[ atoms \]/ {print; getline; print; in_atoms=1; next}
-        in_atoms && NF>=8 {print $0" "$1" 0.0 "$8; next}
-        in_atoms && NF==0 {in_atoms=0; print; next}
-        {print}
-    ' topol_Protein_chain_T.itp > topol_Protein_chain_T_fep.itp
-
-    # 3. 将新拓扑文件添加到主拓扑文件中
-    if ! grep -q "topol_Protein_chain_T_fep.itp" topol.top; then
-        sed -i '/#include "topol_Protein_chain_T.itp"/a #include "topol_Protein_chain_T_fep.itp"' topol.top
-    fi
-
-    # 4. 添加耦合参数到拓扑文件
-    echo -e "\n[ moleculetype ]\n; Name         nrexcl\nProtein_chain_T_fep     3\n" >> topol.top
-    echo -e "[ intermolecular_interactions ]\n[ energygrps_table ]\nProtein_chain_H Protein_chain_L Protein_chain_T_fep\n" >> topol.top
-    echo "✓ 步骤10已完成"
-else
-    echo "步骤 10: 跳过FEP拓扑准备"
-fi
-
-# ========== 步骤11: 创建FEP窗口 ==========
-if $DO_FEP_WINDOWS; then
-    echo "步骤 11: 创建FEP窗口..."
-    mkdir -p fep_windows
-    cd fep_windows || exit
-
-    # 定义 λ 值（21 个窗口）
-    LAMBDA_VALUES=(0.00 0.05 0.10 0.15 0.20 0.25 0.30 0.35 0.40 0.45 0.50 0.55 0.60 0.65 0.70 0.75 0.80 0.85 0.90 0.95 1.00)
-
-    # 设置最大并行任务数
-    MAX_JOBS=4  # 根据系统资源调整
-    RUNNING=0
-
-    for i in "${!LAMBDA_VALUES[@]}"; do
-        L_DIR="lambda_${LAMBDA_VALUES[$i]}"
-        mkdir -p "$L_DIR"
-        cd "$L_DIR" || exit
-
-        # 复制初始结构和拓扑
-        cp "../../md.gro" "./${BASE_NAME}_start.gro"
-        cp "../../topol.top" "./topol.top"
-        cp "../../topol_Protein_chain_H.itp" "./"
-        cp "../../topol_Protein_chain_L.itp" "./"
-        cp "../../topol_Protein_chain_T.itp" "./"
-        cp "../../topol_Protein_chain_T_fep.itp" "./"
-        cp "../../index.ndx" "./index.ndx"
-        cp "../../${MDP_DIR}/fep.mdp" "./fep.mdp"
-
-        # 生成 .tpr 文件，指定当前 λ 状态
-        # 注意：在实际使用时，应在fep.mdp中设置init-lambda-state参数
-        gmx grompp -f fep.mdp \
-            -c "${BASE_NAME}_start.gro" \
-            -p topol.top \
-            -n index.ndx \
-            -o fep.tpr \
-            -maxwarn 1 || { echo "grompp for λ=${LAMBDA_VALUES[$i]} 失败"; exit 1; }
-
-        # 运行 FEP 模拟（后台并控制并行数）
-        gmx mdrun -v -deffnm fep &
-        RUNNING=$((RUNNING+1))
-
-        # 当达到最大并发数时等待任务完成
-        if [ $RUNNING -ge $MAX_JOBS ]; then
-            wait -n
-            RUNNING=$((RUNNING-1))
-        fi
-
-        cd .. || exit
-    done
-    wait  # 等待所有剩余任务完成
-    cd "$WORK_DIR" || exit
-    echo "✓ 步骤11已完成"
-else
-    echo "步骤 11: 跳过FEP窗口创建"
-fi
-
-# ========== 步骤12: 分析FEP结果 ==========
-if $DO_FEP_ANALYSIS; then
-    echo "步骤 12: 分析FEP结果..."
-    gmx bar -f fep_windows/lambda_*/fep.xvg -o bar.xvg -b 1000 || { echo "gmx bar 失败"; exit 1; }
-    echo "✓ 步骤12已完成"
-else
-    echo "步骤 12: 跳过FEP结果分析"
-fi
-
-echo "完成时间: $(date)"
-echo "日志已保存到: $LOG_FILE"
-echo "如需查看结合自由能结果，请检查 bar.xvg 文件"
+# 计算抗原-抗体结合能
