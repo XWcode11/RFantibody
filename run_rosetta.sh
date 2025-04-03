@@ -1,7 +1,7 @@
 #!/bin/bash
 # 运行 rosetta 的脚本
 ROSETTA_PATH=/home/xw/rosetta/rosetta.binary.linux.release-371/main/source/bin
-subdir= $1
+subdir=$1
 PDB_DIR=./output_data/rf2/${subdir}
 rosetta_outdir=./output_data/rosetta/${subdir}
 
