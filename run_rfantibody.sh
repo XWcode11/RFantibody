@@ -51,6 +51,6 @@ poetry run python /home/scripts/rf2_predict.py \
     output.pdb_dir=$rf2_output_dir 
 
 # extract the scores from the rf2 results
-poetry run python extract_pdb_scores.py $rf2_output_dir --output $rf2_output_dir/${output_name}_scores.csv 
+poetry run python extract_pdb_scores.py $rf2_output_dir --output $rf2_output_dir/${output_name}-${tag}-scores.csv 
 
 echo $output_name "finished!"
