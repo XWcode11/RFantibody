@@ -42,27 +42,39 @@ class TestHLTtoAntiFoldConversion:
         assert "H" in chains, "Heavy chain H missing from output"
         assert "L" in chains, "Light chain L missing from output"
 
-    def test_residue_numbering_starts_at_one(self):
-        """Each chain should start numbering from 1 for IMGT compatibility."""
+    def test_cdrs_aligned_to_imgt_anchors(self):
+        """CDR residues must land in AntiFold's IMGT ranges (27-38/56-65/105-117)."""
         input_pdb = "test/proteinmpnn/inputs_for_test/ab_des_0.pdb"
         converter = HLTtoAntiFoldConverter()
         output_lines = converter.convert(input_pdb, heavy_chain="H", light_chain="L")
 
-        h_residues = []
-        l_residues = []
-        for line in output_lines:
-            if line.startswith("ATOM"):
-                chain = line[21:22].strip()
-                resno = int(line[22:26].strip())
-                if chain == "H":
-                    h_residues.append(resno)
-                elif chain == "L":
-                    l_residues.append(resno)
+        cdr_old_labels: dict[tuple[str, int], str] = {}
+        with open(input_pdb) as f:
+            for line in f:
+                if line.startswith("REMARK PDBinfo-LABEL"):
+                    parts = line.strip().split()
+                    if len(parts) >= 4 and parts[-1][:1] in ("H", "L") and parts[-1][1:] in ("1", "2", "3"):
+                        cdr_old_labels[(parts[-1][0], int(parts[2]))] = parts[-1]
 
-        if h_residues:
-            assert min(h_residues) == 1, f"H chain numbering should start at 1, got {min(h_residues)}"
-        if l_residues:
-            assert min(l_residues) == 1, f"L chain numbering should start at 1, got {min(l_residues)}"
+        original_ca, converted_ca = [], []
+        with open(input_pdb) as f:
+            for line in f:
+                if line.startswith("ATOM") and line[12:16].strip() == "CA":
+                    original_ca.append((line[21:22].strip(), int(line[22:26].strip())))
+        for line in output_lines:
+            if line.startswith("ATOM") and line[12:16].strip() == "CA":
+                converted_ca.append((line[21:22].strip(), int(line[22:26].strip())))
+
+        imgt_ranges = {"1": range(27, 39), "2": range(56, 66), "3": range(105, 118)}
+        for (chain_orig, resno_orig), label in cdr_old_labels.items():
+            if (chain_orig, resno_orig) not in original_ca:
+                continue
+            idx = original_ca.index((chain_orig, resno_orig))
+            _, new_resno = converted_ca[idx]
+            assert new_resno in imgt_ranges[label[1]], (
+                f"CDR{label} old-resno {resno_orig} mapped to {new_resno}, "
+                f"outside IMGT range {imgt_ranges[label[1]].start}-{imgt_ranges[label[1]].stop - 1}"
+            )
 
     def test_cdr_regions_mapped_correctly(self):
         """CDR regions from HLT REMARKs should map to AntiFold IMGT regions."""
