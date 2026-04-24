@@ -3,18 +3,17 @@ name = "rfantibody"
 version = "1.0.0"
 description = ""
 readme = "README.md"
-requires-python = "==3.10.*"
+requires-python = ">=3.10"
 authors = [
     { name = "Nate Bennett", email = "nrbennett2@gmail.com" },
     { name = "Joe Watchwell", email = "joe.watchwell@gmail.com" }
 ]
 dependencies = [
-    "torch==2.3.*",
+    "torch>=2.3.0",
     "torchaudio",
     "torchvision",
     "torch-utils",
     "numpy>=1.0,<2.0",
-    "cuda-python==11.8",
     "hydra-core",
     "icecream",
     "opt-einsum",
@@ -24,6 +23,7 @@ dependencies = [
     "pyrsistent",
     "click>=8.0.0",
     "pandas",
+    "fair-esm>=2.0.0",
 ]
 
 [project.optional-dependencies]
