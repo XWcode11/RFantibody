@@ -1,0 +1,39 @@
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    python3.10 python3-pip vim make wget curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+
+ENV PATH="/home/.venv/bin:/root/.local/bin:$PATH" \
+    UV_PROJECT_ENVIRONMENT=/home/.venv \
+    RFANTIBODY_ROOT=/home \
+    RFANTIBODY_WEIGHTS=/home/weights \
+    RFANTIBODY_SCRIPTS=/home/scripts \
+    PYTHONPATH=/home/src:/home/include/SE3Transformer
+
+WORKDIR /home
+
+# Copy project into the same layout expected by the original scripts.
+COPY pyproject.toml uv.lock README.md LICENSE /home/
+COPY src /home/src
+COPY scripts /home/scripts
+COPY include /home/include
+COPY test /home/test
+COPY weights /home/weights
+
+# Install the complete project environment during build.
+RUN uv sync --frozen --all-extras
+
+# Ensure all production weights are available even in a clean build context.
+RUN set -eux; \
+    mkdir -p /home/weights; \
+    [ -s /home/weights/RFdiffusion_Ab.pt ] || wget -O /home/weights/RFdiffusion_Ab.pt https://files.ipd.uw.edu/pub/RFantibody/RFdiffusion_Ab.pt; \
+    [ -s /home/weights/ProteinMPNN_v48_noise_0.2.pt ] || wget -O /home/weights/ProteinMPNN_v48_noise_0.2.pt https://files.ipd.uw.edu/pub/RFantibody/ProteinMPNN_v48_noise_0.2.pt; \
+    [ -s /home/weights/RF2_ab.pt ] || wget -O /home/weights/RF2_ab.pt https://files.ipd.uw.edu/pub/RFantibody/RF2_ab.pt; \
+    [ -s /home/weights/RFab_noframework-nosidechains-5-10-23_trainingparamsadded.pt ] || wget -O /home/weights/RFab_noframework-nosidechains-5-10-23_trainingparamsadded.pt 'https://zenodo.org/records/17488258/files/RFab_noframework-nosidechains-5-10-23_trainingparamsadded.pt?download=1'
+
+ENTRYPOINT /bin/bash
