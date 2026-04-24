@@ -13,7 +13,7 @@ dependencies = [
     "torchaudio",
     "torchvision",
     "torch-utils",
-    "numpy>=1.0,<2.0",
+    "numpy>=1.26",
     "hydra-core",
     "icecream",
     "opt-einsum",
@@ -24,6 +24,8 @@ dependencies = [
     "click>=8.0.0",
     "pandas",
     "fair-esm>=2.0.0",
+    "biopython>=1.80",
+    "torch-geometric>=2.6.0",
 ]
 
 [project.optional-dependencies]
@@ -51,11 +53,10 @@ rf2 = "rfantibody.cli.inference:rf2"
 torch = { index = "pytorch" }
 torchaudio = { index = "pytorch" }
 torchvision = { index = "pytorch" }
-dgl = { url = "https://data.dgl.ai/wheels/torch-2.3/cu118/dgl-2.4.0%2Bcu118-cp310-cp310-manylinux1_x86_64.whl" }
 
 [[tool.uv.index]]
 name = "pytorch"
-url = "https://download.pytorch.org/whl/cu118"
+url = "https://download.pytorch.org/whl/cu124"
 explicit = true
 
 [build-system]
