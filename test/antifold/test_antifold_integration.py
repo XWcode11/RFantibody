@@ -108,24 +108,24 @@ class TestHLTtoAntiFoldConversion:
                 assert line[21:22].strip() in ("H", "L")
 
 
-class TestAntiFoldRunnerInterface:
-    """Test AntiFoldRunner has the same interface as ProteinMPNN_runner."""
+class TestAntiFold_runnerInterface:
+    """Test AntiFold_runner has the same interface as ProteinMPNN_runner."""
 
     def test_runner_has_sequence_optimize_method(self):
-        """AntiFoldRunner must implement sequence_optimize()."""
-        from rfantibody.antifold.antifold_runner import AntiFoldRunner
-        assert hasattr(AntiFoldRunner, "sequence_optimize")
+        """AntiFold_runner must implement sequence_optimize()."""
+        from rfantibody.antifold.antifold_runner import AntiFold_runner
+        assert hasattr(AntiFold_runner, "sequence_optimize")
 
     def test_runner_has_proteinmpnn_compatible_signature(self):
         """sequence_optimize must accept SampleFeatures and return list of (seq, score)."""
-        from rfantibody.antifold.antifold_runner import AntiFoldRunner
+        from rfantibody.antifold.antifold_runner import AntiFold_runner
         import inspect
 
-        sig = inspect.signature(AntiFoldRunner.sequence_optimize)
+        sig = inspect.signature(AntiFold_runner.sequence_optimize)
         params = list(sig.parameters.keys())
         assert "sample_feats" in params, "sequence_optimize must accept sample_feats parameter"
 
     def test_runner_has_run_model_method(self):
-        """AntiFoldRunner must implement run_model() for StructManager integration."""
-        from rfantibody.antifold.antifold_runner import AntiFoldRunner
-        assert hasattr(AntiFoldRunner, "run_model")
+        """AntiFold_runner must implement run_model() for StructManager integration."""
+        from rfantibody.antifold.antifold_runner import AntiFold_runner
+        assert hasattr(AntiFold_runner, "run_model")

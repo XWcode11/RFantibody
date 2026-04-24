@@ -272,10 +272,10 @@ def proteinmpnn(
     if augment_eps is not None:
         cmd.extend(['-augment_eps', str(augment_eps)])
 
-    # Model weights
+    # Model weights (backend-aware: antifold loads its own weights via PathConfig)
     if weights:
         cmd.extend(['-checkpoint_path', str(weights)])
-    else:
+    elif backend == 'proteinmpnn':
         default_weights = PathConfig.get_weight_path('proteinmpnn')
         if default_weights.exists():
             cmd.extend(['-checkpoint_path', str(default_weights)])

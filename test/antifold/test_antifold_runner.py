@@ -1,5 +1,5 @@
 """
-Test AntiFoldRunner with mocked AntiFold model.
+Test AntiFold_runner with mocked AntiFold model.
 
 TDD approach: test the interface and workflow before real model integration.
 """
@@ -33,39 +33,39 @@ class MockArgs:
         self.allow_x = False
 
 
-class TestAntiFoldRunnerWorkflow:
-    """Test AntiFoldRunner workflow with mocked model."""
+class TestAntiFold_runnerWorkflow:
+    """Test AntiFold_runner workflow with mocked model."""
 
     def test_runner_loads_converter(self):
         """Runner should instantiate HLTtoAntiFoldConverter."""
-        from rfantibody.antifold.antifold_runner import AntiFoldRunner
+        from rfantibody.antifold.antifold_runner import AntiFold_runner
         from rfantibody.proteinmpnn.struct_manager import StructManager
 
         args = MockArgs(pdbdir="test/proteinmpnn/inputs_for_test")
         struct_manager = StructManager(args)
-        runner = AntiFoldRunner(args, struct_manager)
+        runner = AntiFold_runner(args, struct_manager)
         assert runner.converter is not None
 
     def test_runner_sets_device(self):
         """Runner should detect GPU/CPU and set device."""
-        from rfantibody.antifold.antifold_runner import AntiFoldRunner
+        from rfantibody.antifold.antifold_runner import AntiFold_runner
         from rfantibody.proteinmpnn.struct_manager import StructManager
 
         args = MockArgs(pdbdir="test/proteinmpnn/inputs_for_test")
         struct_manager = StructManager(args)
-        runner = AntiFoldRunner(args, struct_manager)
+        runner = AntiFold_runner(args, struct_manager)
         assert runner.device in ("cpu", "cuda:0")
 
     def test_sequence_optimize_returns_list_of_tuples(self):
         """sequence_optimize must return list of (seq, score) tuples."""
-        from rfantibody.antifold.antifold_runner import AntiFoldRunner
+        from rfantibody.antifold.antifold_runner import AntiFold_runner
         from rfantibody.proteinmpnn.struct_manager import StructManager
         from rfantibody.proteinmpnn.sample_features import SampleFeatures
         from rfantibody.util.pose import Pose
 
         args = MockArgs(pdbdir="test/proteinmpnn/inputs_for_test")
         struct_manager = StructManager(args)
-        runner = AntiFoldRunner(args, struct_manager)
+        runner = AntiFold_runner(args, struct_manager)
 
         # Mock the actual AntiFold call
         runner._run_antifold = MagicMock(return_value=[
@@ -90,13 +90,13 @@ class TestAntiFoldRunnerWorkflow:
 
     def test_run_model_creates_output(self):
         """run_model should process one structure and write output."""
-        from rfantibody.antifold.antifold_runner import AntiFoldRunner
+        from rfantibody.antifold.antifold_runner import AntiFold_runner
         from rfantibody.proteinmpnn.struct_manager import StructManager
 
         with tempfile.TemporaryDirectory() as tmpdir:
             args = MockArgs(pdbdir="test/proteinmpnn/inputs_for_test", outpdbdir=tmpdir)
             struct_manager = StructManager(args)
-            runner = AntiFoldRunner(args, struct_manager)
+            runner = AntiFold_runner(args, struct_manager)
 
             # Mock sequence generation
             runner._run_antifold = MagicMock(return_value=[

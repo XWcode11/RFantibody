@@ -46,12 +46,12 @@ class TestAntiFoldRealInference:
 
     def test_model_loads_successfully(self):
         """AntiFold model should load without errors."""
-        from rfantibody.antifold.antifold_runner import AntiFoldRunner
+        from rfantibody.antifold.antifold_runner import AntiFold_runner
         from rfantibody.proteinmpnn.struct_manager import StructManager
 
         args = MockArgs(pdbdir="test/proteinmpnn/inputs_for_test")
         struct_manager = StructManager(args)
-        runner = AntiFoldRunner(args, struct_manager)
+        runner = AntiFold_runner(args, struct_manager)
 
         # Trigger lazy loading
         model = runner.model
@@ -59,13 +59,13 @@ class TestAntiFoldRealInference:
 
     def test_run_antifold_returns_sequences(self):
         """_run_antifold should return real sequences with scores."""
-        from rfantibody.antifold.antifold_runner import AntiFoldRunner
+        from rfantibody.antifold.antifold_runner import AntiFold_runner
         from rfantibody.proteinmpnn.struct_manager import StructManager
         from rfantibody.antifold.imgt_converter import HLTtoAntiFoldConverter
 
         args = MockArgs(pdbdir="test/proteinmpnn/inputs_for_test")
         struct_manager = StructManager(args)
-        runner = AntiFoldRunner(args, struct_manager)
+        runner = AntiFold_runner(args, struct_manager)
 
         # Convert test PDB to AntiFold format
         converter = HLTtoAntiFoldConverter()
@@ -91,14 +91,14 @@ class TestAntiFoldRealInference:
 
     def test_sequence_optimize_threads_to_pose(self):
         """sequence_optimize should produce threadable sequences."""
-        from rfantibody.antifold.antifold_runner import AntiFoldRunner
+        from rfantibody.antifold.antifold_runner import AntiFold_runner
         from rfantibody.proteinmpnn.struct_manager import StructManager
         from rfantibody.proteinmpnn.sample_features import SampleFeatures
         from rfantibody.util.pose import Pose
 
         args = MockArgs(pdbdir="test/proteinmpnn/inputs_for_test")
         struct_manager = StructManager(args)
-        runner = AntiFoldRunner(args, struct_manager)
+        runner = AntiFold_runner(args, struct_manager)
 
         input_pdb = "test/proteinmpnn/inputs_for_test/ab_des_0.pdb"
         pose = Pose.from_pdb(input_pdb)

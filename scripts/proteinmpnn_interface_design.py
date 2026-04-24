@@ -108,6 +108,14 @@ class ProteinMPNN_runner():
     def sequence_optimize(self, sample_feats: SampleFeatures) -> list[tuple[str, float]]:
         t0 = time.time()
 
+        # ProteinMPNN backend is designed for antibody-target interface design;
+        # it uses the last chain as visible context (target) and redesigns the rest.
+        # Antibody-only inputs (no T chain) should use the AntiFold backend instead.
+        assert 'T' in sample_feats.chains, (
+            f"ProteinMPNN backend requires a target chain 'T'. Got chains {sample_feats.chains}. "
+            "For antibody-only inputs, use '-backend antifold'."
+        )
+
         # Once we have figured out pose I/O without Rosetta this will be easy to swap in
         pdbfile = 'temp.pdb'
         sample_feats.pose.dump_pdb(pdbfile)
@@ -185,8 +193,8 @@ struct_manager = StructManager(args)
 
 # Select backend runner
 if args.backend == "antifold":
-    from rfantibody.antifold.antifold_runner import AntiFoldRunner
-    runner = AntiFoldRunner(args, struct_manager)
+    from rfantibody.antifold.antifold_runner import AntiFold_runner
+    runner = AntiFold_runner(args, struct_manager)
     print("Using AntiFold backend for sequence design")
 else:
     runner = ProteinMPNN_runner(args, struct_manager)
