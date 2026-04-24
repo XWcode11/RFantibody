@@ -21,7 +21,7 @@ def main():
     """Main function to run the tests"""
     parser = argparse.ArgumentParser(description='Run RFAntibody tests')
     parser.add_argument('--module', type=str, default='all',
-                        help='Test module to run (rfdiffusion, proteinmpnn, rf2, util, or all)')
+                        help='Test module to run (rfdiffusion, proteinmpnn, antifold, rf2, util, quiver, or all)')
     parser.add_argument('--create-refs', action='store_true', 
                         help='Create reference files from current outputs')
     parser.add_argument('--verbose', '-v', action='store_true',
@@ -32,7 +32,7 @@ def main():
     
     # Determine which modules to test
     modules = []
-    all_modules = ['rfdiffusion', 'proteinmpnn', 'rf2', 'util', 'quiver']
+    all_modules = ['rfdiffusion', 'proteinmpnn', 'antifold', 'rf2', 'util', 'quiver']
     if args.module == 'all':
         modules = all_modules
     else:
@@ -119,8 +119,9 @@ def main():
     for module in modules:
         print(f"\nRunning {module} tests...")
         
-        # Configure pytest arguments
-        pytest_args = ["-xvs", f"test/{module}/test_{module}.py"]
+        # Configure pytest arguments (target the module directory so all
+        # test_*.py files are discovered, not just test_{module}.py)
+        pytest_args = ["-xvs", f"test/{module}"]
             
         if args.verbose:
             pytest_args.append("-v")

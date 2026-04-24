@@ -1,28 +1,33 @@
 #!/bin/bash
+
 # End-to-end validation: RFdiffusion -> ProteinMPNN (baseline) + AntiFold (new backend)
+#
+# Runs a small design batch through both sequence-design backends on the same
+# RFdiffusion-generated antibody backbones for qualitative comparison.
+
 set -e
 
-PROJECT_ROOT="/mnt/data1/xiongw/Projects/active/AI_Protein/RFantibody"
-cd "$PROJECT_ROOT"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+EXAMPLES_DIR="$SCRIPT_DIR"
 
-source .venv/bin/activate
-export PYTHONPATH="/tmp/antifold_repo:${PROJECT_ROOT}/src:${PROJECT_ROOT}/include/SE3Transformer:${PYTHONPATH:-}"
+NUM_BACKBONES=${NUM_BACKBONES:-5}
+SEQS_PER_STRUCT=${SEQS_PER_STRUCT:-2}
 
-OUTDIR="/tmp/rfantibody_e2e"
+OUTDIR="${OUTDIR:-$EXAMPLES_DIR/example_outputs/e2e_antifold_validation}"
 RFD_OUT="${OUTDIR}/1_rfdiffusion"
 MPNN_OUT="${OUTDIR}/2_proteinmpnn"
 ANTIFOLD_OUT="${OUTDIR}/2_antifold"
 mkdir -p "$RFD_OUT" "$MPNN_OUT" "$ANTIFOLD_OUT"
 
 echo "======================================================================"
-echo "[Stage 1/3] RFdiffusion: 2 antibody backbones targeting RSV site3"
+echo "[Stage 1/2] RFdiffusion: ${NUM_BACKBONES} antibody backbones targeting RSV site3"
 echo "======================================================================"
 t0=$(date +%s)
-rfdiffusion \
-    --target scripts/examples/example_inputs/rsv_site3.pdb \
-    --framework scripts/examples/example_inputs/hu-4D5-8_Fv.pdb \
+uv run rfdiffusion \
+    --target "$EXAMPLES_DIR/example_inputs/rsv_site3.pdb" \
+    --framework "$EXAMPLES_DIR/example_inputs/hu-4D5-8_Fv.pdb" \
     --output "${RFD_OUT}/ab_des" \
-    --num-designs 2 \
+    --num-designs "${NUM_BACKBONES}" \
     --design-loops "L1:8-13,L2:7,L3:9-11,H1:7,H2:6,H3:5-13" \
     --hotspots "T305,T456" \
     --diffuser-t 50 \
@@ -34,13 +39,13 @@ ls -l "${RFD_OUT}"/*.pdb 2>/dev/null | head -10
 
 echo ""
 echo "======================================================================"
-echo "[Stage 2a/3] ProteinMPNN (baseline backend)"
+echo "[Stage 2a/2] ProteinMPNN (baseline backend)"
 echo "======================================================================"
 t0=$(date +%s)
-proteinmpnn \
+uv run proteinmpnn \
     --input-dir "${RFD_OUT}" \
     --output-dir "${MPNN_OUT}" \
-    --seqs-per-struct 2 \
+    --seqs-per-struct "${SEQS_PER_STRUCT}" \
     --temperature 0.2 \
     --backend proteinmpnn 2>&1 | tail -20
 echo "[Stage 2a done in $(($(date +%s)-t0))s]"
@@ -50,13 +55,13 @@ ls -l "${MPNN_OUT}"/*.pdb 2>/dev/null | head -10
 
 echo ""
 echo "======================================================================"
-echo "[Stage 2b/3] AntiFold (new backend)"
+echo "[Stage 2b/2] AntiFold (new backend)"
 echo "======================================================================"
 t0=$(date +%s)
-proteinmpnn \
+uv run proteinmpnn \
     --input-dir "${RFD_OUT}" \
     --output-dir "${ANTIFOLD_OUT}" \
-    --seqs-per-struct 2 \
+    --seqs-per-struct "${SEQS_PER_STRUCT}" \
     --temperature 0.2 \
     --backend antifold 2>&1 | tail -20
 echo "[Stage 2b done in $(($(date +%s)-t0))s]"
