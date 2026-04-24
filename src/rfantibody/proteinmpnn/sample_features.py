@@ -40,13 +40,14 @@ class SampleFeatures():
 
         desloops = [l.upper() for l in loop_string.split(',')]
 
-        # Assert correct chain ordering with T (target) last for interface design
+        # Assert correct chain ordering. Interface design needs T (target) last;
+        # antibody-only design (e.g. AntiFold) allows H or H-L without target.
         chains = np.unique(self.pose.chain).tolist()
-        valid_orderings = [['H', 'L', 'T'], ['H', 'T']]
+        valid_orderings = [['H', 'L', 'T'], ['H', 'T'], ['H', 'L'], ['H']]
         assert chains in valid_orderings, (
             f"Invalid chain ordering: {chains}. "
             f"Expected one of {valid_orderings}. "
-            "Chains must be in H-L-T order with T (target) last for interface design."
+            "Chains must follow H[-L][-T] order with T (target) last when present."
         )
 
         fixed_res = {}
