@@ -57,6 +57,8 @@ parser.add_argument("-num_connections", type=int, default=48,
                          'better interface design but will cost more to run the model.')
 parser.add_argument("-allow_x", action="store_true", default=False,
                     help='Allow X (unknown) residues in output. Useful for debugging to see exactly which positions were designed.')
+parser.add_argument("-backend", type=str, default="proteinmpnn", choices=["proteinmpnn", "antifold"],
+                    help='Sequence design backend to use (default: proteinmpnn)')
 
 args = parser.parse_args(sys.argv[1:])
 
@@ -172,7 +174,7 @@ class ProteinMPNN_runner():
 
         seconds = int(time.time() - t0)
 
-        print(f"Struct: {pdb} reported success in {seconds} seconds")
+        print(f"Struct: {tag} reported success in {seconds} seconds")
 
 
 ####################
@@ -180,16 +182,24 @@ class ProteinMPNN_runner():
 ####################
 
 struct_manager = StructManager(args)
-proteinmpnn_runner = ProteinMPNN_runner(args, struct_manager)
+
+# Select backend runner
+if args.backend == "antifold":
+    from rfantibody.antifold.antifold_runner import AntiFoldRunner
+    runner = AntiFoldRunner(args, struct_manager)
+    print("Using AntiFold backend for sequence design")
+else:
+    runner = ProteinMPNN_runner(args, struct_manager)
+    print("Using ProteinMPNN backend for sequence design")
 
 for pdb in struct_manager.iterate():
 
-    if args.debug: proteinmpnn_runner.run_model(pdb, args)
+    if args.debug: runner.run_model(pdb, args)
 
     else: # When not in debug mode the script will continue to run even when some poses fail
         t0 = time.time()
 
-        try: proteinmpnn_runner.run_model(pdb, args)
+        try: runner.run_model(pdb, args)
 
         except KeyboardInterrupt: sys.exit("Script killed by Control+C, exiting")
 

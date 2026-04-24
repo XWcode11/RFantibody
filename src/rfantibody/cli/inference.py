@@ -185,6 +185,8 @@ def rfdiffusion(
               help='Amino acids to omit from design (default: CX)')
 @click.option('--augment-eps', type=float, default=None,
               help='Backbone noise augmentation (default: model default)')
+@click.option('--backend', '-b', type=click.Choice(['proteinmpnn', 'antifold']), default='proteinmpnn',
+              help='Sequence design backend to use (default: proteinmpnn)')
 @click.option('--deterministic', is_flag=True,
               help='Enable deterministic mode for reproducibility')
 @click.option('--debug', is_flag=True,
@@ -202,6 +204,7 @@ def proteinmpnn(
     weights: Optional[Path],
     omit_aas: str,
     augment_eps: Optional[float],
+    backend: str,
     deterministic: bool,
     debug: bool,
     allow_x: bool
@@ -277,6 +280,9 @@ def proteinmpnn(
         if default_weights.exists():
             cmd.extend(['-checkpoint_path', str(default_weights)])
 
+    # Backend
+    cmd.extend(['-backend', backend])
+
     # Flags
     if deterministic:
         cmd.append('-deterministic')
@@ -286,10 +292,11 @@ def proteinmpnn(
         cmd.append('-allow_x')
 
     input_source = input_dir or input_quiver
-    click.echo(f'Running ProteinMPNN sequence design...')
+    click.echo(f'Running {backend.upper()} sequence design...')
     click.echo(f'Input: {input_source}')
     click.echo(f'Loops: {loops}')
     click.echo(f'Sequences per structure: {seqs_per_struct}')
+    click.echo(f'Backend: {backend}')
 
     result = subprocess.run(cmd, cwd=str(PathConfig.PROJECT_ROOT))
     sys.exit(result.returncode)
