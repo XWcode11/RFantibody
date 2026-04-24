@@ -76,7 +76,8 @@ class PathConfig:
         weights = {
             'rfdiffusion': 'RFdiffusion_Ab.pt',
             'proteinmpnn': 'ProteinMPNN_v48_noise_0.2.pt',
-            'rf2': 'RF2_ab.pt'
+            'rf2': 'RF2_ab.pt',
+            'antifold': 'antifold_model.pt'
         }
 
         if model not in weights:
