@@ -31,6 +31,14 @@
 - The test framework automatically detects GPU type and uses appropriate reference files
 
 ## Development Log
+### 2026-04-24
+- Added AntiFold as a second sequence-design backend alongside ProteinMPNN
+- Vendored upstream source into include/antifold/ (see include/antifold/UPSTREAM.md for commit hash and local patches); registered as wheel target in pyproject.toml
+- Renamed AntiFoldRunner to AntiFold_runner; added backend-aware guards in proteinmpnn_interface_design.py (require T chain) and cli/inference.py (no MPNN weight fallback)
+- Added test/antifold/ module with conftest.py (GPU whitelist relaxed to any CUDA device); switched test/run_tests.py to directory-level pytest discovery
+- Rewrote scripts/examples/e2e_antifold_validation.sh with SCRIPT_DIR-relative paths; added scripts/examples/e2e_rf2_score.sh for dual-backend RF2 scoring
+- Numerics verified equivalent to upstream (max |Δlogits| = 7.63e-06, within CUDA noise baseline); 18/18 tests pass on A100
+
 ### 2026-01-27
 - Replaced USalign-based structural alignment with biotite's Kabsch superposition for RMSD calculations
 - Simplified RMSD calculation workflow: now uses direct Cα superposition for same-length sequences
