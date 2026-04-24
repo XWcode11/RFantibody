@@ -67,6 +67,7 @@ build-backend = "hatchling.build"
 packages = [
     "src/rfantibody",
     "include/SE3Transformer/se3_transformer",
+    "include/antifold/antifold",
     "test",
 ]
 

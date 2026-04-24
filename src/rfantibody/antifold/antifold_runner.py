@@ -6,7 +6,6 @@ Wraps AntiFold inverse folding model for antibody CDR sequence design.
 
 import os
 import re
-import sys
 import tempfile
 
 import torch
@@ -15,7 +14,7 @@ from rfantibody.antifold.imgt_converter import HLTtoAntiFoldConverter
 from rfantibody.config import PathConfig
 
 
-class AntiFoldRunner:
+class AntiFold_runner():
     """AntiFold sequence design runner with ProteinMPNN-compatible interface."""
 
     def __init__(self, args, struct_manager):
@@ -55,11 +54,6 @@ class AntiFoldRunner:
         Returns:
             Loaded AntiFold ESM-IF1 model
         """
-        # Ensure antifold package is importable
-        antifold_repo = "/tmp/antifold_repo"
-        if os.path.exists(antifold_repo) and antifold_repo not in sys.path:
-            sys.path.insert(0, antifold_repo)
-
         from antifold.antiscripts import load_IF1_checkpoint
         from antifold.esm.pretrained import _load_IF1_local
 
