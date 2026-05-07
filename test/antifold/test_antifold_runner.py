@@ -4,9 +4,11 @@ Test AntiFold_runner with mocked AntiFold model.
 TDD approach: test the interface and workflow before real model integration.
 """
 
+import importlib.util
 import os
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -31,6 +33,15 @@ class MockArgs:
         self.omit_AAs = "CX"
         self.num_connections = 48
         self.allow_x = False
+
+
+def _load_sequence_design_script_module():
+    script_path = Path(__file__).resolve().parents[2] / "scripts" / "proteinmpnn_interface_design.py"
+    spec = importlib.util.spec_from_file_location("proteinmpnn_interface_design", script_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 class TestAntiFold_runnerWorkflow:
@@ -111,3 +122,109 @@ class TestAntiFold_runnerWorkflow:
             # Should have created output file(s)
             output_files = list(Path(tmpdir).glob("*.pdb"))
             assert len(output_files) > 0, f"No output PDB files in {tmpdir}"
+
+
+class TestSequenceDesignLoop:
+    def test_zero_persisted_outputs_exit_nonzero(self, tmp_path: Path):
+        module = _load_sequence_design_script_module()
+
+        class FakeStructManager:
+            output_pdb = True
+            output_quiver = False
+
+            def __init__(self):
+                self.outpdbdir = str(tmp_path / "outputs")
+                self.outquiver = SimpleNamespace(get_tags=lambda: [])
+                self.checkpoints: list[str] = []
+
+            def iterate(self):
+                yield "design_a"
+                yield "design_b"
+
+            def record_checkpoint(self, pdb):
+                self.checkpoints.append(pdb)
+
+        class FakeRunner:
+            def run_model(self, _pdb, _args):
+                return None
+
+        struct_manager = FakeStructManager()
+        args = SimpleNamespace(debug=False, backend="antifold")
+
+        with pytest.raises(SystemExit, match="produced zero persisted outputs"):
+            module._run_design_loop(args, struct_manager, FakeRunner())
+
+        assert struct_manager.checkpoints == []
+
+    def test_only_successful_outputs_are_checkpointed(self, tmp_path: Path):
+        module = _load_sequence_design_script_module()
+
+        class FakeStructManager:
+            output_pdb = True
+            output_quiver = False
+
+            def __init__(self):
+                self.outpdbdir = str(tmp_path / "outputs")
+                self.outquiver = SimpleNamespace(get_tags=lambda: [])
+                self.checkpoints: list[str] = []
+
+            def iterate(self):
+                yield "design_success"
+                yield "design_failure"
+
+            def record_checkpoint(self, pdb):
+                self.checkpoints.append(pdb)
+
+        class FakeRunner:
+            def run_model(self, pdb, _args):
+                output_dir = tmp_path / "outputs"
+                output_dir.mkdir(parents=True, exist_ok=True)
+                if pdb == "design_success":
+                    (output_dir / "design_success_dldesign_0.pdb").write_text("ATOM\n", encoding="utf-8")
+                    return None
+                raise RuntimeError("boom")
+
+        struct_manager = FakeStructManager()
+        args = SimpleNamespace(debug=False, backend="antifold")
+
+        module._run_design_loop(args, struct_manager, FakeRunner())
+
+        assert struct_manager.checkpoints == ["design_success"]
+
+    def test_overwriting_existing_output_still_counts_as_success(self, tmp_path: Path):
+        module = _load_sequence_design_script_module()
+
+        class FakeStructManager:
+            output_pdb = True
+            output_quiver = False
+
+            def __init__(self):
+                self.outpdbdir = str(tmp_path / "outputs")
+                self.outquiver = SimpleNamespace(get_tags=lambda: [])
+                self.checkpoints: list[str] = []
+
+            def iterate(self):
+                yield "design_success"
+
+            def record_checkpoint(self, pdb):
+                self.checkpoints.append(pdb)
+
+        class FakeRunner:
+            def run_model(self, _pdb, _args):
+                output_dir = tmp_path / "outputs"
+                output_dir.mkdir(parents=True, exist_ok=True)
+                (output_dir / "design_success_dldesign_0.pdb").write_text(
+                    "UPDATED_OUTPUT_WITH_NEW_SIZE\n",
+                    encoding="utf-8",
+                )
+
+        output_dir = tmp_path / "outputs"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "design_success_dldesign_0.pdb").write_text("OLD\n", encoding="utf-8")
+
+        struct_manager = FakeStructManager()
+        args = SimpleNamespace(debug=False, backend="antifold")
+
+        module._run_design_loop(args, struct_manager, FakeRunner())
+
+        assert struct_manager.checkpoints == ["design_success"]

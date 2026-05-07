@@ -60,20 +60,102 @@ parser.add_argument("-allow_x", action="store_true", default=False,
 parser.add_argument("-backend", type=str, default="proteinmpnn", choices=["proteinmpnn", "antifold"],
                     help='Sequence design backend to use (default: proteinmpnn)')
 
-args = parser.parse_args(sys.argv[1:])
+def _configure_determinism(args) -> None:
+    if not args.deterministic:
+        return
 
-# Set up deterministic mode if requested
-if args.deterministic:
     print("Setting up deterministic mode with fixed seeds")
-    # Set fixed seeds for reproducibility
     random.seed(42)
     np.random.seed(42)
     torch.manual_seed(42)
     torch.cuda.manual_seed_all(42)
-    
-    # Enable deterministic behavior
+
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+
+def _normalize_input_tag(tag: str) -> str:
+    """Normalize an input identifier to the basename used by output tags."""
+    return os.path.basename(tag).split('.')[0]
+
+
+def _snapshot_output_state(struct_manager, tag: str):
+    """Capture the persisted outputs currently associated with one input tag."""
+    prefix = f"{_normalize_input_tag(tag)}_dldesign_"
+
+    if struct_manager.output_pdb:
+        if not os.path.isdir(struct_manager.outpdbdir):
+            return {}
+
+        snapshot = {}
+        for name in os.listdir(struct_manager.outpdbdir):
+            if not (name.startswith(prefix) and name.endswith('.pdb')):
+                continue
+
+            path = os.path.join(struct_manager.outpdbdir, name)
+            if not os.path.isfile(path):
+                continue
+
+            stat_result = os.stat(path)
+            snapshot[name] = (stat_result.st_mtime_ns, stat_result.st_size)
+
+        return snapshot
+
+    if struct_manager.output_quiver:
+        return tuple(sorted(tag_name for tag_name in struct_manager.outquiver.get_tags() if tag_name.startswith(prefix)))
+
+    return ()
+
+
+def _persisted_outputs_changed(before_snapshot, after_snapshot) -> bool:
+    """Return whether a backend call created or updated persisted outputs."""
+    return before_snapshot != after_snapshot and bool(after_snapshot)
+
+
+def _run_design_loop(args, struct_manager, runner) -> None:
+    """Run the selected sequence-design backend across all pending structures."""
+    attempted_structs = 0
+    successful_structs = 0
+    failed_structs = 0
+
+    for pdb in struct_manager.iterate():
+        attempted_structs += 1
+        output_snapshot_before = _snapshot_output_state(struct_manager, pdb)
+
+        if args.debug:
+            runner.run_model(pdb, args)
+            output_snapshot_after = _snapshot_output_state(struct_manager, pdb)
+            if not _persisted_outputs_changed(output_snapshot_before, output_snapshot_after):
+                raise RuntimeError(f"{args.backend} produced no persisted outputs for {pdb}")
+            successful_structs += 1
+            struct_manager.record_checkpoint(pdb)
+            continue
+
+        t0 = time.time()
+
+        try:
+            runner.run_model(pdb, args)
+            output_snapshot_after = _snapshot_output_state(struct_manager, pdb)
+            if not _persisted_outputs_changed(output_snapshot_before, output_snapshot_after):
+                raise RuntimeError(f"{args.backend} produced no persisted outputs for {pdb}")
+
+        except KeyboardInterrupt:
+            sys.exit("Script killed by Control+C, exiting")
+
+        except Exception:
+            failed_structs += 1
+            seconds = int(time.time() - t0)
+            print(f"Struct with tag {pdb} failed in {seconds} seconds with error: {sys.exc_info()[0]}")
+            continue
+
+        successful_structs += 1
+        struct_manager.record_checkpoint(pdb)
+
+    if attempted_structs > 0 and successful_structs == 0:
+        sys.exit(f"{args.backend} produced zero persisted outputs across {attempted_structs} attempted structures")
+
+    if failed_structs:
+        print(f"Completed with {failed_structs} failed structure(s) that were left uncheckpointed")
 
 class ProteinMPNN_runner():
     '''
@@ -189,34 +271,26 @@ class ProteinMPNN_runner():
 ####### Main #######
 ####################
 
-struct_manager = StructManager(args)
+def main(argv: list[str] | None = None) -> None:
+    args = parser.parse_args(sys.argv[1:] if argv is None else argv)
+    _configure_determinism(args)
 
-# Select backend runner
-if args.backend == "antifold":
-    from rfantibody.antifold.antifold_runner import AntiFold_runner
-    runner = AntiFold_runner(args, struct_manager)
-    print("Using AntiFold backend for sequence design")
-else:
-    runner = ProteinMPNN_runner(args, struct_manager)
-    print("Using ProteinMPNN backend for sequence design")
+    struct_manager = StructManager(args)
 
-for pdb in struct_manager.iterate():
+    if args.backend == "antifold":
+        from rfantibody.antifold.antifold_runner import AntiFold_runner
 
-    if args.debug: runner.run_model(pdb, args)
+        runner = AntiFold_runner(args, struct_manager)
+        print("Using AntiFold backend for sequence design")
+    else:
+        runner = ProteinMPNN_runner(args, struct_manager)
+        print("Using ProteinMPNN backend for sequence design")
 
-    else: # When not in debug mode the script will continue to run even when some poses fail
-        t0 = time.time()
+    _run_design_loop(args, struct_manager, runner)
 
-        try: runner.run_model(pdb, args)
 
-        except KeyboardInterrupt: sys.exit("Script killed by Control+C, exiting")
-
-        except:
-            seconds = int(time.time() - t0)
-            print(f"Struct with tag {pdb} failed in {seconds} seconds with error: {sys.exc_info()[0]}")
-
-    # We are done with one pdb, record that we finished
-    struct_manager.record_checkpoint(pdb)
+if __name__ == "__main__":
+    main()
     
 
 

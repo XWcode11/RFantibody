@@ -3,7 +3,7 @@ name = "rfantibody"
 version = "1.0.0"
 description = ""
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = "==3.10.*"
 authors = [
     { name = "Nate Bennett", email = "nrbennett2@gmail.com" },
     { name = "Joe Watchwell", email = "joe.watchwell@gmail.com" }
@@ -53,6 +53,7 @@ rf2 = "rfantibody.cli.inference:rf2"
 torch = { index = "pytorch" }
 torchaudio = { index = "pytorch" }
 torchvision = { index = "pytorch" }
+dgl = { url = "https://data.dgl.ai/wheels/torch-2.6/cu124/dgl-2.5.0%2Bcu124-cp310-cp310-manylinux1_x86_64.whl" }
 
 [[tool.uv.index]]
 name = "pytorch"

@@ -150,6 +150,15 @@ Navigate to the directory where RFantibody is downloaded, then build the Docker 
 docker build -t rfantibody .
 ```
 
+For the production image in [Dockerfile.prod](Dockerfile.prod), first populate the local `weights/` directory and then build from that Dockerfile:
+
+```bash
+bash include/download_weights.sh
+docker build --network=host -f Dockerfile.prod -t rfandibody-antifold .
+```
+
+`Dockerfile.prod` now expects those weight files to already exist in the local build context; it does not download them during the image build.
+
 ### Start the Docker Container
 
 Run the following command to start the container:
